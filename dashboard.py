@@ -29,13 +29,17 @@ if attendance_rows:
     df = pd.DataFrame(attendance_rows)
 
     def fmt_duration(row):
-        end = row["check_out_time"] if row["check_out_time"] else datetime.now()
+        # pd.isna() correctly catches both plain None and pandas' NaT marker.
+        # A plain truthy check (`if row["check_out_time"]`) breaks once the
+        # column contains a mix of real timestamps and missing values,
+        # because NaT evaluates as True, not False.
+        end = datetime.now() if pd.isna(row["check_out_time"]) else row["check_out_time"]
         delta = end - row["check_in_time"]
         total_minutes = int(delta.total_seconds() // 60)
         return f"{total_minutes // 60}h {total_minutes % 60}m"
 
     df["duration"] = df.apply(fmt_duration, axis=1)
-    df["status"] = df["check_out_time"].apply(lambda x: "Checked out" if x else "Present now")
+    df["status"] = df["check_out_time"].apply(lambda x: "Present now" if pd.isna(x) else "Checked out")
 
     st.dataframe(
         df[["name", "role", "check_in_time", "check_out_time", "duration", "status"]],
